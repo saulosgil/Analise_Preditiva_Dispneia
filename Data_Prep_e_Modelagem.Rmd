@@ -16,8 +16,10 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 library(tidyverse) # metapackage of all tidyverse packages
 library(tidymodels)
 library(GGally)
+library(DataExplorer)
 # library(doParallel)
 ```
+
 
 ## Lendo a base
 
@@ -34,8 +36,7 @@ glimpse(dispneia)
 ```{r}
 set.seed(32)
 
-dispneia_initial_split <- initial_split(dispneia, prop = 0.8,
-                                        strata = "dispneia")
+dispneia_initial_split <- initial_split(dispneia, prop = 0.8, strata = "dispneia")
 
 dispneia_train <- training(dispneia_initial_split)
 
@@ -43,7 +44,7 @@ dispneia_test <- testing(dispneia_initial_split)
 
 ```
 
-## Análise Exploratória
+## Análise Exploratória  (Base de treino)
 
 ### Visualização geral
 
@@ -53,9 +54,94 @@ skimr::skim(dispneia_train)
 
 ### Verificando a presença de dados faltantes
 
-```{r}
-visdat::vis_miss(dispneia_train)
+```{r, fig.height=12, fig.width=14, message=FALSE, warning=FALSE}
+plot_missing(dispneia_train)
 ```
 
 ## Verificando correlação das variáveis numéricas
 
+```{r, out.width="100%"}
+dispneia_train |>  
+  select(where(is.numeric)) |>  
+  cor(use = "pairwise.complete.obs") |> 
+  corrplot::corrplot(method = "number")
+```
+```{r, fig.height=14, fig.width=14, message=FALSE, warning=FALSE}
+dispneia_train |>  
+  select(where(is.numeric), dispneia) |> 
+  ggpairs(aes(colour = dispneia))
+```
+
+## Verificando a distribuição das variáveis categóricas
+
+```{r, fig.height=8}
+contagens <- dispneia_train |>  
+  select(c(where(is.character), dispneia)) |> 
+  pivot_longer(-dispneia, names_to = "variavel", values_to = "valor") |> 
+  count(dispneia, variavel, valor)
+
+# tabela
+contagens |> 
+  pivot_wider(names_from = dispneia, values_from = n) |> 
+  DT::datatable()
+```
+
+```{r, fig.height=16, fig.width=16}
+contagens |> 
+  ggplot(aes(y = valor, x = n, fill = dispneia)) +
+  geom_col(position = "fill") +
+  geom_label(aes(label = n), position = position_fill(vjust = 0.5)) +
+  facet_wrap(~variavel, scales = "free_y", ncol = 3) +
+  ggtitle("Dispneia vs. Variáveis Categóricas")
+
+# Steps que podem ser usadas no DATAPREP para lidar com os variáveis correlacionada.
+
+# step_corr() <-  creates a specification of a recipe step that will potentially remove variables that have large absolute correlations with other variables.
+
+# step_lincomb() <- creates a specification of a recipe step that will potentially remove numeric variables that have linear combinations between them.
+
+```
+
+```{r, fig.height=14, fig.width=16}
+dispneia_train |>  
+  select(c(where(is.numeric), dispneia)) |> 
+  pivot_longer(-dispneia, names_to = "variavel", values_to = "valor") |> 
+  ggplot(aes(y = dispneia, x = valor, fill = dispneia)) +
+  geom_boxplot() +
+  facet_wrap(~variavel, scales = "free_x") +
+  # scale_x_log10() +
+  ggtitle("Dispnéia vs. Variáveis Numéricas")
+```
+
+```{r, fig.height=14, fig.width=16}
+dispneia_train |>  
+  select(c(where(is.numeric), dispneia)) |> 
+  pivot_longer(-dispneia, names_to = "variavel", values_to = "valor") |> 
+  ggplot(aes(x = valor, colour = dispneia)) +
+  stat_ecdf() +
+  facet_wrap(~variavel, scales = "free_x") +
+  labs(title = "Dispneia vs. Variáveis Numéricas",
+       subtitle = "Distribuição Acumulada")
+```
+
+```{r, fig.height=14, fig.width=16}
+grafico_de_barras_das_vars_continuas <- function(dados) {
+  dados |>  
+    select(c(where(is.numeric), dispneia)) |> 
+    pivot_longer(-dispneia, names_to = "variavel", values_to = "valor") |> 
+    dplyr::group_by(variavel) %>%
+    dplyr::mutate(
+      valor = factor(dplyr::ntile(valor, 10), levels = 1:10)
+    ) |> 
+    dplyr::count(dispneia, variavel, valor) |> 
+    ggplot(aes(y = (valor), x = n, fill = dispneia)) +
+    geom_col(position = "fill") +
+    geom_label(aes(label = n), position = position_fill(vjust = 0.5)) +
+    facet_wrap(~variavel, scales = "free_y", ncol = 3) +
+    ggtitle("Dispneia vs. Variáveis Numéricas")
+}
+
+grafico_de_barras_das_vars_continuas(dispneia_train)
+```
+
+## Pré-processamento

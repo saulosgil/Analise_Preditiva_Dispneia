@@ -1,0 +1,61 @@
+---
+title: "Análise Preditiva da Dispneia em sobreviventes da COVID-19"
+author: "Saulo Gil"
+date: '`r format(Sys.Date(), "%d/%m/%Y")`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Carregando pacotes
+
+```{r}
+# Pacotes
+library(tidyverse) # metapackage of all tidyverse packages
+library(tidymodels)
+library(GGally)
+# library(doParallel)
+```
+
+## Lendo a base
+
+```{r}
+# Lendo a base
+dispneia <- read.csv2("adjusted dataset/df_ajustada.csv")
+
+glimpse(dispneia)
+
+```
+
+## Dividindo a base treino/teste
+
+```{r}
+set.seed(32)
+
+dispneia_initial_split <- initial_split(dispneia, prop = 0.8,
+                                        strata = "dispneia")
+
+dispneia_train <- training(dispneia_initial_split)
+
+dispneia_test <- testing(dispneia_initial_split)
+
+```
+
+## Análise Exploratória
+
+### Visualização geral
+
+```{r}
+skimr::skim(dispneia_train)
+```
+
+### Verificando a presença de dados faltantes
+
+```{r}
+visdat::vis_miss(dispneia_train)
+```
+
+## Verificando correlação das variáveis numéricas
+

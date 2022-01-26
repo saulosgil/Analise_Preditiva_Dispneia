@@ -3,7 +3,7 @@ library(dplyr)
 
 # Lendo a base --------------------------------------------------------------------------------
 
-df <- readxl::read_excel("crude dataset/Dados_atualizados_Saulo 10.12.xls")
+df <- readxl::read_excel("Analise_Preditiva_Dispneia/crude dataset/Dados_atualizados_Saulo 10.12.xls")
 
 glimpse(df)
 
@@ -42,7 +42,8 @@ df_ajustada <- df |> janitor::clean_names()|> # Arrumando nome dos vetores
     -los_total_77,
     -dialysis_78,
     -intubation_79,
-    -score_isi
+    -score_isi,
+    -skin_problem_persistent_fup
   ) |> # Arrumando as variáveis
   mutate(age = as.numeric(age)) |>  # arrumando age
   mutate(age = case_when(age >= 60 ~ "idoso",
@@ -75,8 +76,6 @@ df_ajustada <- df |> janitor::clean_names()|> # Arrumando nome dos vetores
                                              diarrhea_persistent_fup == 1 ~ "Yes"),
          nausea_vomiting_persistent_fup = case_when(nausea_vomiting_persistent_fup == 0 ~ "No", # nausea_vomiting_persistent_fup
                                                     nausea_vomiting_persistent_fup == 1 ~ "Yes"),
-         skin_problem_persistent_fup = case_when(skin_problem_persistent_fup == 0 ~ "No", # skin_problem_persistent_fup
-                                                 skin_problem_persistent_fup == 1 ~ "Yes"),
          loss_consciousness_presence_post_covid_incident = case_when(loss_consciousness_presence_post_covid_incident == 0 ~ "No", # loss_consciousness_presence_post_covid_incident
                                                                      loss_consciousness_presence_post_covid_incident == 1 ~ "Yes"),
          loss_appetite_persistent_fup_incident = case_when(loss_appetite_persistent_fup_incident == 0 ~ "No", # loss_appetite_persistent_fup_incident
@@ -134,7 +133,7 @@ df_ajustada <- df |> janitor::clean_names()|> # Arrumando nome dos vetores
                                         who_severity_class == 4 ~ "critico"),
          ipaq_classification = case_when(ipaq_classification < 3 ~ "inativo",
                                          ipaq_classification >= 3 ~ "ativo")) |>
-  rename(idade = age,
+  rename(idade = age, # ajustando os nomes da variaveis
          sexo = sex,
          adm_uti = icu_care_6,
          tempo_uti = icu_los_2,
@@ -149,7 +148,6 @@ df_ajustada <- df |> janitor::clean_names()|> # Arrumando nome dos vetores
          dor_abdominal = abdominal_symptoms_persistent_fup,
          diarreia = diarrhea_persistent_fup,
          nausea = nausea_vomiting_persistent_fup,
-         alteracao_pele = skin_problem_persistent_fup,
          perda_consciencia = loss_consciousness_presence_post_covid_incident,
          inapetencia = loss_appetite_persistent_fup_incident,
          parestesia = parestesia_persistent_fup_incident_correto,
@@ -180,11 +178,10 @@ df_ajustada <- df |> janitor::clean_names()|> # Arrumando nome dos vetores
          hipertensao = hypertension,
          gravidade_adm = who_severity_class,
          nivel_atf = ipaq_classification
-         )
-
-glimpse(df_ajustada)
+         ) |>
+  filter(!is.na(dispneia)) # tirando os NAs do desfecho
 
 # Novo .csv -----------------------------------------------------------------------------------
 
 readr::write_csv2(x = df_ajustada,
-                  file = "adjusted dataset/df_ajustada.csv")
+                  file = "Analise_Preditiva_Dispneia/adjusted dataset/df_ajustada.csv")

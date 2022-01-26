@@ -25,6 +25,7 @@ library(DataExplorer)
 
 ```{r}
 # Lendo a base
+
 dispneia <- read.csv2("adjusted dataset/df_ajustada.csv")
 
 glimpse(dispneia)
@@ -50,6 +51,7 @@ dispneia_test <- testing(dispneia_initial_split)
 
 ```{r}
 skimr::skim(dispneia_train)
+
 ```
 
 ### Verificando a presença de dados faltantes
@@ -145,3 +147,101 @@ grafico_de_barras_das_vars_continuas(dispneia_train)
 ```
 
 ## Pré-processamento
+
+### Data prep - RECIPES
+```{r}
+# receita
+
+dispneia_recipe <- recipe(formula = dispneia ~ ., dispneia_train) |>
+  step_normalize(all_numeric_predictors()) |> # normalizando todas vars continuas
+  step_corr(all_numeric_predictors(), threshold = .8) |>  # excluindo vars correlacionadas r > 0.8
+  step_impute_mean(all_numeric_predictors()) |>  # imputando dados nas variaveis númericas
+  step_impute_mode(all_nominal_predictors()) |> # imput. dados nas variaveis nominais (mais comum)
+  step_zv(all_predictors()) |>  # remove variavies que contem apenas zero (zero variance filter)
+  step_poly(all_numeric_predictors(), degree = 9) |>  # transformações polinomiais
+  step_dummy(all_nominal_predictors()) |>
+  step_impute_mode(all_nominal_predictors()) 
+  
+
+# Verificando o resultado da receita (e seu os steps deram certo!).
+
+dispneia_recipe |> 
+    prep() |> 
+    bake(new_data = dispneia_train) |> 
+    glimpse()
+```
+
+
+## Definição da validação cruzada
+
+```{r}
+dispneia_resamples <- vfold_cv(dispneia_train, v = 3, strata = dispneia) # como a base é pequena optei por 3 folds
+dispneia_resamples$splits
+```
+
+## Modelagem
+
+### Modelo
+
+```{r}
+dispneia_lr_model <- logistic_reg(penalty = tune(), mixture = 1) |> 
+  set_mode("classification") |> 
+  set_engine("glmnet")
+```
+
+### Workflow
+
+```{r}
+dispneia_wf <- workflow() |> 
+  add_model(dispneia_lr_model) |> 
+  add_recipe(dispneia_recipe)
+
+```
+
+## Tunagem
+
+```{r}
+# definindo o grid
+
+grid <- grid_regular(
+  penalty(range = c(-4, 1)),
+  levels = 20
+)
+```
+
+```{r}
+# fazer processamento paralelo
+
+doParallel::registerDoParallel()
+
+# Tunagem
+
+dispneia_lr_tune_grid <- tune_grid(
+  dispneia_wf,
+  resamples = dispneia_resamples,
+  grid = grid,
+  metrics = metric_set(roc_auc, accuracy, sensitivity, specificity),
+  verbose = TRUE
+)
+```
+
+```{r}
+
+autoplot(dispneia_lr_tune_grid)
+
+collect_metrics(dispneia_lr_tune_grid)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -17,6 +17,7 @@ library(tidyverse) # metapackage of all tidyverse packages
 library(tidymodels)
 library(GGally)
 library(DataExplorer)
+library(vip)
 # library(doParallel)
 ```
 
@@ -95,13 +96,6 @@ contagens |>
   geom_label(aes(label = n), position = position_fill(vjust = 0.5)) +
   facet_wrap(~variavel, scales = "free_y", ncol = 3) +
   ggtitle("Dispneia vs. Variáveis Categóricas")
-
-# Steps que podem ser usadas no DATAPREP para lidar com os variáveis correlacionada.
-
-# step_corr() <-  creates a specification of a recipe step that will potentially remove variables that have large absolute correlations with other variables.
-
-# step_lincomb() <- creates a specification of a recipe step that will potentially remove numeric variables that have linear combinations between them.
-
 ```
 
 ```{r, fig.height=14, fig.width=16}
@@ -159,8 +153,8 @@ dispneia_recipe <- recipe(formula = dispneia ~ ., dispneia_train) |>
   step_impute_mode(all_nominal_predictors()) |> # imput. dados nas variaveis nominais (mais comum)
   step_zv(all_predictors()) |>  # remove variavies que contem apenas zero (zero variance filter)
   step_poly(all_numeric_predictors(), degree = 9) |>  # transformações polinomiais
-  step_dummy(all_nominal_predictors()) |>
-  step_impute_mode(all_nominal_predictors()) 
+  step_dummy(all_nominal_predictors()) |> # criando as dummy para nominais
+  step_impute_mode(all_nominal_predictors()) # imput. missing (maior freq.) 
   
 
 # Verificando o resultado da receita (e seu os steps deram certo!).
@@ -181,7 +175,7 @@ dispneia_resamples$splits
 
 ## Modelagem
 
-### Modelo
+### Regressão Logistica
 
 ```{r}
 dispneia_lr_model <- logistic_reg(penalty = tune(), mixture = 1) |> 
@@ -192,13 +186,13 @@ dispneia_lr_model <- logistic_reg(penalty = tune(), mixture = 1) |>
 ### Workflow
 
 ```{r}
-dispneia_wf <- workflow() |> 
+dispneia_lr_wf <- workflow() |> 
   add_model(dispneia_lr_model) |> 
   add_recipe(dispneia_recipe)
 
 ```
 
-## Tunagem
+### Tunagem
 
 ```{r}
 # definindo o grid
@@ -217,7 +211,7 @@ doParallel::registerDoParallel()
 # Tunagem
 
 dispneia_lr_tune_grid <- tune_grid(
-  dispneia_wf,
+  dispneia_lr_wf,
   resamples = dispneia_resamples,
   grid = grid,
   metrics = metric_set(roc_auc, accuracy, sensitivity, specificity),
@@ -225,14 +219,143 @@ dispneia_lr_tune_grid <- tune_grid(
 )
 ```
 
-```{r}
+```{r, out.width="100%"}
 
 autoplot(dispneia_lr_tune_grid)
 
-collect_metrics(dispneia_lr_tune_grid)
+collect_metrics(dispneia_lr_tune_grid) 
 
 ```
 
+### Desempenho do Modelo Final
+
+```{r}
+# Desempenho do modelo finaL ----------------------------------------------
+
+# Logistica
+
+dispneia_lr_best_params <- select_best(dispneia_lr_tune_grid, "roc_auc")
+dispneia_lr_wf <- dispneia_lr_wf %>% finalize_workflow(dispneia_lr_best_params)
+dispneia_lr_last_fit <- last_fit(dispneia_lr_wf, dispneia_initial_split)
+
+collect_predictions(dispneia_lr_last_fit) %>% mutate(modelo = "Regressão Logistica") |> 
+  group_by(modelo) |> 
+  roc_curve(dispneia, .pred_No) |> 
+  autoplot()
+```
+
+
+```{r}
+dispneia_lr_last_fit_model <- dispneia_lr_last_fit$.workflow[[1]]$fit$fit
+vip::vip(dispneia_lr_last_fit_model)
+
+```
+
+## Random forest
+
+```{r}
+# Modelo
+
+dispneia_rf_model <- rand_forest(
+  mtry = tune(),
+  trees = tune(),
+  min_n = tune()
+) |> 
+  set_mode("classification") |> 
+  set_engine("ranger")
+```
+
+### Workflow
+
+```{r}
+# Workflow
+
+dispneia_rf_wf <- workflow() |> 
+  add_model(dispneia_rf_model) |> 
+  add_recipe(dispneia_recipe)
+
+```
+
+### Tunagem
+
+```{r}
+# Tune
+
+dispneia_grid_rf <- grid_random(
+  min_n(range = c(200, 250)),
+  mtry(range = c(4, 18)),
+  trees(range = c(50, 100)))
+
+```
+
+```{r}
+doParallel::registerDoParallel(4)
+
+dispneia_rf_tune_grid <- tune_grid(
+  dispneia_rf_wf,
+  resamples = dispneia_resamples,
+  grid = dispneia_grid_rf,
+  metrics = metric_set(roc_auc, accuracy, sensitivity, specificity),
+  verbose = TRUE
+  )
+```
+
+```{r, out.width="100%"}
+
+autoplot(dispneia_rf_tune_grid)
+
+collect_metrics(dispneia_rf_tune_grid)
+
+```
+
+### Desempenho do modelo final
+
+```{r}
+# Desempenho do modelo finaL ----------------------------------------------
+
+# Random Forest
+
+dispneia_rf_best_params <- select_best(dispneia_rf_tune_grid, "roc_auc")
+dispneia_rf_wf <- dispneia_rf_wf %>% finalize_workflow(dispneia_rf_best_params)
+dispneia_rf_last_fit <- last_fit(dispneia_rf_wf, dispneia_initial_split)
+
+collect_predictions(dispneia_rf_last_fit) %>% mutate(modelo = "Random Forest") |> 
+  group_by(modelo) |> 
+  roc_curve(dispneia, .pred_No) |> 
+  autoplot()
+```
+
+```{r}
+# Variáveis importantes - NÃO ESTA RODANDO!
+
+# dispneia_rf_last_fit_model <- dispneia_rf_last_fit$.workflow[[1]]$fit$fit
+# vip::vip(dispneia_rf_last_fit_model,object = "randomForest")
+# 
+# rpart.plot::rpart.plot(dispneia_rf_last_fit_model$fit, faclen = 2)
+```
+
+
+
+
+
+
+## Comparação entre os modelos 
+
+```{r}
+
+# Curva ROC dos modelos treinados 
+
+dispneia_test_preds <- bind_rows(
+  collect_predictions(dispneia_lr_last_fit) %>% mutate(modelo = "Regressão Logistica"),
+  collect_predictions(dispneia_rf_last_fit) %>% mutate(modelo = "Random Forest")
+)
+
+## roc
+dispneia_test_preds |> 
+  group_by(modelo) |> 
+  roc_curve(dispneia, .pred_No) |> 
+  autoplot()
+```
 
 
 

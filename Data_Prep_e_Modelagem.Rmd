@@ -149,13 +149,12 @@ grafico_de_barras_das_vars_continuas(dispneia_train)
 dispneia_recipe <- recipe(formula = dispneia ~ ., dispneia_train) |>
   step_normalize(all_numeric_predictors()) |> # normalizando todas vars continuas
   step_corr(all_numeric_predictors(), threshold = .8) |>  # excluindo vars correlacionadas r > 0.8
-  step_impute_mean(all_numeric_predictors()) |>  # imputando dados nas variaveis númericas
+  step_impute_median(all_numeric_predictors()) |>  # imputando dados nas variaveis númericas
   step_impute_mode(all_nominal_predictors()) |> # imput. dados nas variaveis nominais (mais comum)
   step_zv(all_predictors()) |>  # remove variavies que contem apenas zero (zero variance filter)
-  step_poly(all_numeric_predictors(), degree = 9) |>  # transformações polinomiais
-  step_dummy(all_nominal_predictors()) |> # criando as dummy para nominais
-  step_impute_mode(all_nominal_predictors()) # imput. missing (maior freq.) 
-  
+  step_poly(all_numeric_predictors(), degree = 3) |>  # transformações polinomiais
+  step_dummy(all_nominal_predictors()) # criando as dummy para nominais
+
 
 # Verificando o resultado da receita (e seu os steps deram certo!).
 
@@ -169,7 +168,7 @@ dispneia_recipe |>
 ## Definição da validação cruzada
 
 ```{r}
-dispneia_resamples <- vfold_cv(dispneia_train, v = 3, strata = dispneia) # como a base é pequena optei por 3 folds
+dispneia_resamples <- vfold_cv(dispneia_train, v = 5, strata = dispneia) # como a base é pequena optei por 3 folds
 dispneia_resamples$splits
 ```
 
@@ -223,7 +222,7 @@ dispneia_lr_tune_grid <- tune_grid(
 
 autoplot(dispneia_lr_tune_grid)
 
-collect_metrics(dispneia_lr_tune_grid) 
+collect_metrics(dispneia_lr_tune_grid)
 
 ```
 
@@ -242,6 +241,11 @@ collect_predictions(dispneia_lr_last_fit) %>% mutate(modelo = "Regressão Logist
   group_by(modelo) |> 
   roc_curve(dispneia, .pred_No) |> 
   autoplot()
+
+collect_metrics(dispneia_lr_tune_grid) |> 
+  filter(.metric == "roc_auc") |> 
+  filter(mean == max(mean))
+
 ```
 
 

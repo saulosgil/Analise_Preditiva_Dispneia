@@ -18,6 +18,7 @@ library(tidymodels)
 library(GGally)
 library(DataExplorer)
 library(vip)
+library(randomForest)
 # library(doParallel)
 ```
 
@@ -266,7 +267,7 @@ dispneia_rf_model <- rand_forest(
   min_n = tune()
 ) |> 
   set_mode("classification") |> 
-  set_engine("ranger")
+  set_engine("randomForest")
 ```
 
 ### Workflow
@@ -285,10 +286,10 @@ dispneia_rf_wf <- workflow() |>
 ```{r}
 # Tune
 
-dispneia_grid_rf <- grid_random(
-  min_n(range = c(200, 250)),
+dispneia_grid_rf <- grid_regular(
+  min_n(range = c(200, 350)),
   mtry(range = c(4, 18)),
-  trees(range = c(50, 100)))
+  trees(range = c(25, 75)))
 
 ```
 
@@ -308,7 +309,9 @@ dispneia_rf_tune_grid <- tune_grid(
 
 autoplot(dispneia_rf_tune_grid)
 
-collect_metrics(dispneia_rf_tune_grid)
+collect_metrics(dispneia_rf_tune_grid) |> 
+  filter(.metric == "roc_auc") |> 
+  filter(mean == max(mean))
 
 ```
 

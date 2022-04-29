@@ -28,7 +28,7 @@ library(randomForest)
 ```{r}
 # Lendo a base
 
-dispneia <- read.csv2("adjusted dataset/df_ajustada.csv")
+dispneia <- read.csv2("adjusted dataset/df_ajustava.csv")
 
 glimpse(dispneia)
 
@@ -252,7 +252,8 @@ collect_metrics(dispneia_lr_tune_grid) |>
 
 ```{r}
 dispneia_lr_last_fit_model <- dispneia_lr_last_fit$.workflow[[1]]$fit$fit
-vip::vip(dispneia_lr_last_fit_model)
+vip::vip(dispneia_lr_last_fit_model,
+         geom = "col")
 
 ```
 
@@ -333,17 +334,15 @@ collect_predictions(dispneia_rf_last_fit) %>% mutate(modelo = "Random Forest") |
 ```
 
 ```{r}
-# Variáveis importantes - NÃO ESTA RODANDO!
+dispneia_rf_last_fit_model <- dispneia_rf_last_fit$.workflow[[1]]$fit$fit
+# vip::vip(dispneia_rf_last_fit_model,object = "randomForest") # não funciona
+# rpart.plot::rpart.plot(dispneia_rf_last_fit_model$fit$fit, faclen = 2) # não funciona
 
-# dispneia_rf_last_fit_model <- dispneia_rf_last_fit$.workflow[[1]]$fit$fit
-# vip::vip(dispneia_rf_last_fit_model,object = "randomForest")
-# 
-# rpart.plot::rpart.plot(dispneia_rf_last_fit_model$fit, faclen = 2)
+dispneia_rf_vip <- extract_fit_engine(dispneia_rf_last_fit)
+vip::vip(dispneia_rf_vip)
+
+
 ```
-
-
-
-
 
 
 ## Comparação entre os modelos 

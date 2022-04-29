@@ -3,7 +3,7 @@ library(dplyr)
 
 # Lendo a base --------------------------------------------------------------------------------
 
-df <- readxl::read_excel("Analise_Preditiva_Dispneia/crude dataset/Dados_atualizados_Saulo 10.12.xls")
+df <- readxl::read_excel("crude dataset/Dados_atualizados_Saulo 10.12.xls")
 
 glimpse(df)
 
@@ -51,13 +51,16 @@ df_ajustada <- df |> janitor::clean_names()|> # Arrumando nome dos vetores
          sex = case_when(sex == 0 ~ "female", # arrumando sex
                          sex == 1 ~ "male"),
          icu_care_6 = case_when(icu_care_6 == 0 ~ "No", # icu_care_6
-                                icu_care_6 == 1 ~ "Yes"),
+                                icu_care_6 == 1 ~ "Yes",
+                                icu_care_6 == "NA" ~ "sem info"),
          icu_los_2 = case_when(icu_los_2 > 15 ~ "> 15 dias", # tempo de internação
-                               icu_los_2 <= 15 ~ "ate 15 dias"),
+                               icu_los_2 <= 15 ~ "ate 15 dias",
+                               is.na(icu_los_2) ~ "não foi para UTI"),
          intubation_8 = case_when(intubation_8 == 0 ~ "No", # foi intubado
                                   intubation_8 == 1 ~ "Yes"),
          time_intubation = case_when(time_intubation > 15 ~ "> 15 dias", # tempo de intubação
-                                     time_intubation <= 15 ~ "ate 15 dias"),
+                                     time_intubation <= 15 ~ "ate 15 dias",
+                                     is.na(time_intubation) ~ "Não fez uso de VM"),
          dyspnea_persistent_fup_incident = case_when(dyspnea_persistent_fup_incident == 0 ~ "No", # dyspnea_persistent_fup_incident
                                                      dyspnea_persistent_fup_incident == 1 ~ "Yes"),
          cough_persistent_fup = case_when(cough_persistent_fup == 0 ~ "No", # cough_persistent_fup
@@ -181,7 +184,10 @@ df_ajustada <- df |> janitor::clean_names()|> # Arrumando nome dos vetores
          ) |>
   filter(!is.na(dispneia)) # tirando os NAs do desfecho
 
+# Analise Descritivas -------------------------------------------------------------------------
+skimr::skim(df_ajustada)
+
 # Novo .csv -----------------------------------------------------------------------------------
 
 readr::write_csv2(x = df_ajustada,
-                  file = "Analise_Preditiva_Dispneia/adjusted dataset/df_ajustada.csv")
+                  file = "adjusted dataset/df_ajustava.csv")

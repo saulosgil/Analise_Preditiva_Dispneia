@@ -62,7 +62,7 @@ skimr::skim(dispneia_train)
 plot_missing(dispneia_train)
 ```
 
-## Verificando correlação das variáveis numéricas
+## Verificando a correlação e a distribuição das variáveis numéricas
 
 ```{r, out.width="100%"}
 dispneia_train |>  
@@ -147,7 +147,8 @@ grafico_de_barras_das_vars_continuas(dispneia_train)
 ```{r}
 # receita
 
-dispneia_recipe <- recipe(formula = dispneia ~ ., dispneia_train) |>
+dispneia_recipe <-
+  recipe(formula = dispneia ~ ., dispneia_train) |>
   step_normalize(all_numeric_predictors()) |> # normalizando todas vars continuas
   step_corr(all_numeric_predictors(), threshold = .8) |>  # excluindo vars correlacionadas r > 0.8
   step_impute_median(all_numeric_predictors()) |>  # imputando dados nas variaveis númericas
@@ -169,7 +170,9 @@ dispneia_recipe |>
 ## Definição da validação cruzada
 
 ```{r}
-dispneia_resamples <- vfold_cv(dispneia_train, v = 5, strata = dispneia) # como a base é pequena optei por 3 folds
+dispneia_resamples <- 
+  vfold_cv(dispneia_train, v = 5, strata = dispneia) # como a base é pequena optei por 3 folds
+
 dispneia_resamples$splits
 ```
 
@@ -178,7 +181,8 @@ dispneia_resamples$splits
 ### Regressão Logistica
 
 ```{r}
-dispneia_lr_model <- logistic_reg(penalty = tune(), mixture = 1) |> 
+dispneia_lr_model <- 
+  logistic_reg(penalty = tune(), mixture = 1) |> 
   set_mode("classification") |> 
   set_engine("glmnet")
 ```
@@ -186,7 +190,8 @@ dispneia_lr_model <- logistic_reg(penalty = tune(), mixture = 1) |>
 ### Workflow
 
 ```{r}
-dispneia_lr_wf <- workflow() |> 
+dispneia_lr_wf <-
+  workflow() |> 
   add_model(dispneia_lr_model) |> 
   add_recipe(dispneia_recipe)
 
@@ -197,7 +202,8 @@ dispneia_lr_wf <- workflow() |>
 ```{r}
 # definindo o grid
 
-grid <- grid_regular(
+grid <- 
+  grid_regular(
   penalty(range = c(-4, 1)),
   levels = 20
 )
@@ -210,7 +216,8 @@ doParallel::registerDoParallel()
 
 # Tunagem
 
-dispneia_lr_tune_grid <- tune_grid(
+dispneia_lr_tune_grid <- 
+  tune_grid(
   dispneia_lr_wf,
   resamples = dispneia_resamples,
   grid = grid,
@@ -251,7 +258,9 @@ collect_metrics(dispneia_lr_tune_grid) |>
 
 
 ```{r}
-dispneia_lr_last_fit_model <- dispneia_lr_last_fit$.workflow[[1]]$fit$fit
+dispneia_lr_last_fit_model <-
+  dispneia_lr_last_fit$.workflow[[1]]$fit$fit
+
 vip::vip(dispneia_lr_last_fit_model,
          geom = "col")
 
@@ -276,7 +285,8 @@ dispneia_rf_model <- rand_forest(
 ```{r}
 # Workflow
 
-dispneia_rf_wf <- workflow() |> 
+dispneia_rf_wf <- 
+  workflow() |> 
   add_model(dispneia_rf_model) |> 
   add_recipe(dispneia_recipe)
 
@@ -287,7 +297,8 @@ dispneia_rf_wf <- workflow() |>
 ```{r}
 # Tune
 
-dispneia_grid_rf <- grid_regular(
+dispneia_grid_rf <- 
+  grid_regular(
   min_n(range = c(200, 350)),
   mtry(range = c(4, 18)),
   trees(range = c(25, 75)))
@@ -297,7 +308,8 @@ dispneia_grid_rf <- grid_regular(
 ```{r}
 doParallel::registerDoParallel(4)
 
-dispneia_rf_tune_grid <- tune_grid(
+dispneia_rf_tune_grid <-
+  tune_grid(
   dispneia_rf_wf,
   resamples = dispneia_resamples,
   grid = dispneia_grid_rf,
@@ -327,7 +339,8 @@ dispneia_rf_best_params <- select_best(dispneia_rf_tune_grid, "roc_auc")
 dispneia_rf_wf <- dispneia_rf_wf %>% finalize_workflow(dispneia_rf_best_params)
 dispneia_rf_last_fit <- last_fit(dispneia_rf_wf, dispneia_initial_split)
 
-collect_predictions(dispneia_rf_last_fit) %>% mutate(modelo = "Random Forest") |> 
+collect_predictions(dispneia_rf_last_fit) |> 
+  mutate(modelo = "Random Forest") |> 
   group_by(modelo) |> 
   roc_curve(dispneia, .pred_No) |> 
   autoplot()
@@ -338,9 +351,10 @@ dispneia_rf_last_fit_model <- dispneia_rf_last_fit$.workflow[[1]]$fit$fit
 # vip::vip(dispneia_rf_last_fit_model,object = "randomForest") # não funciona
 # rpart.plot::rpart.plot(dispneia_rf_last_fit_model$fit$fit, faclen = 2) # não funciona
 
-dispneia_rf_vip <- extract_fit_engine(dispneia_rf_last_fit)
-vip::vip(dispneia_rf_vip)
+dispneia_rf_vip <- 
+  extract_fit_engine(dispneia_rf_last_fit)
 
+vip::vip(dispneia_rf_vip)
 
 ```
 
@@ -351,9 +365,10 @@ vip::vip(dispneia_rf_vip)
 
 # Curva ROC dos modelos treinados 
 
-dispneia_test_preds <- bind_rows(
-  collect_predictions(dispneia_lr_last_fit) %>% mutate(modelo = "Regressão Logistica"),
-  collect_predictions(dispneia_rf_last_fit) %>% mutate(modelo = "Random Forest")
+dispneia_test_preds <- 
+  bind_rows(
+  collect_predictions(dispneia_lr_last_fit) |>  mutate(modelo = "Regressão Logistica"),
+  collect_predictions(dispneia_rf_last_fit) |>  mutate(modelo = "Random Forest")
 )
 
 ## roc
